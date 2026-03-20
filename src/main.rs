@@ -2,7 +2,7 @@
 #![windows_subsystem = "windows"]
 mod win;
 
-use crate::win::{get_desktop_listview, get_icon_data, get_wallpaper_pixels, slice_taskbar, CollisionShape, IconData};
+use crate::win::{capture_all_icons, get_wallpaper_pixels, slice_taskbar, CollisionShape, IconData};
 use image::imageops::FilterType;
 use image::DynamicImage;
 use pixels::{Pixels, SurfaceTexture};
@@ -10,7 +10,7 @@ use rapier2d::prelude::*;
 use std::sync::Arc;
 use std::time::Instant;
 use windows::Win32::UI::Controls::LVM_GETITEMCOUNT;
-use windows::Win32::UI::WindowsAndMessaging::SendMessageW;
+use windows::Win32::UI::WindowsAndMessaging::{SendMessageW, SystemParametersInfoW, SPI_GETDESKWALLPAPER, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS};
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
@@ -120,19 +120,24 @@ impl AppMain<'_> {
         self.grabbed_body = None;
     }
     fn scan_desktop_icons(&mut self) {
-        if let Some(hwnd) = get_desktop_listview() {
-            unsafe {
-                let count = SendMessageW(hwnd, LVM_GETITEMCOUNT, None, None);
-                let icon_total = count.0;
-                println!("Found {} icons on the desktop!", count.0);
-                for i in 0..icon_total {
-                    if let Some(icon_data) = get_icon_data(hwnd,i as i32) {
-                        println!("icon {}, x {}, y {}, w {}, h {}",i,icon_data.x,icon_data.y,icon_data.width,icon_data.height);
-                        self.icons.push(icon_data)
-                    };
-                }
-            }
+        
+        // Get original wallpaper path first
+        let mut buffer = [0u16; 260];
+        unsafe {
+            let _ = SystemParametersInfoW(
+                SPI_GETDESKWALLPAPER, buffer.len() as u32,
+                Some(buffer.as_mut_ptr() as *mut _),
+                SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0),
+            );
         }
+        let len = buffer.iter().position(|&i| i == 0).unwrap_or(buffer.len());
+        let original_path = String::from_utf16_lossy(&buffer[..len]);
+        
+        // Single-pass icon capture with transparency
+        self.icons = capture_all_icons(&original_path);
+        println!("Captured {} icons with transparency", self.icons.len());
+        
+        // Taskbar slices unchanged
         let taskbar_elements = slice_taskbar(self.window_w as i32 / 100);
         println!("Found {} taskbar elements!", taskbar_elements.len());
         self.icons.extend(taskbar_elements);
@@ -310,7 +315,6 @@ impl ApplicationHandler for AppMain<'_> {
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _window_id: WindowId, event: WindowEvent) {
         match event {
             WindowEvent::CloseRequested => {
-                #[cfg(debug_assertions)]
                 event_loop.exit()
             },
             WindowEvent::RedrawRequested => {
