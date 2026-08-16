@@ -8,5 +8,5 @@ edition = "2024"
 pixels = "0.15.0"
 winit = "0.30.13"
 rapier2d = {version = "0.32.0", features = ["simd-stable"]}
-windows = { version = "0.62.1", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_System_Memory", "Win32_System_Threading", "Win32_System_Diagnostics_Debug", "Win32_UI_Controls", "Win32_Graphics_Gdi", "Win32_UI_Shell", "Win32_Storage", "Win32_Storage_FileSystem", "Win32_System_LibraryLoader", "Win32_System_Console", "Win32_Storage_Xps", "Win32_Storage_Xps_Printing"] }
+windows = { version = "0.62.1", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_System_Memory", "Win32_System_Threading", "Win32_System_Diagnostics_Debug", "Win32_UI_Controls", "Win32_Graphics_Gdi", "Win32_UI_Shell", "Win32_Storage", "Win32_Storage_FileSystem", "Win32_System_LibraryLoader", "Win32_System_Console", "Win32_System_Registry", "Win32_Storage_Xps_Printing", "Win32_Storage_Xps", "Win32_Graphics_Dwm"] }
 image = "0.25.10"

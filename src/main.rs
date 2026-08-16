@@ -2,15 +2,13 @@
 #![windows_subsystem = "windows"]
 mod win;
 
-use crate::win::{capture_all_icons, get_wallpaper_pixels, slice_taskbar, CollisionShape, IconData};
+use crate::win::{capture_all_icons, get_wallpaper_path_from_registry, get_wallpaper_pixels, CollisionShape, IconData};
 use image::imageops::FilterType;
 use image::DynamicImage;
 use pixels::{Pixels, SurfaceTexture};
 use rapier2d::prelude::*;
 use std::sync::Arc;
 use std::time::Instant;
-use windows::Win32::UI::Controls::LVM_GETITEMCOUNT;
-use windows::Win32::UI::WindowsAndMessaging::{SendMessageW, SystemParametersInfoW, SPI_GETDESKWALLPAPER, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS};
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
@@ -120,27 +118,17 @@ impl AppMain<'_> {
         self.grabbed_body = None;
     }
     fn scan_desktop_icons(&mut self) {
+        // Get the real wallpaper path from the registry
+        let original_path = get_wallpaper_path_from_registry()
+            .unwrap_or_default();
         
-        // Get original wallpaper path first
-        let mut buffer = [0u16; 260];
-        unsafe {
-            let _ = SystemParametersInfoW(
-                SPI_GETDESKWALLPAPER, buffer.len() as u32,
-                Some(buffer.as_mut_ptr() as *mut _),
-                SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0),
-            );
-        }
-        let len = buffer.iter().position(|&i| i == 0).unwrap_or(buffer.len());
-        let original_path = String::from_utf16_lossy(&buffer[..len]);
-        
-        // Single-pass icon capture with transparency
-        self.icons = capture_all_icons(&original_path);
+        self.icons = capture_all_icons(
+            &original_path,
+            self.window_w,
+            self.window_h,
+            self.window_w as i32 / 100,
+        );
         println!("Captured {} icons with transparency", self.icons.len());
-        
-        // Taskbar slices unchanged
-        let taskbar_elements = slice_taskbar(self.window_w as i32 / 100);
-        println!("Found {} taskbar elements!", taskbar_elements.len());
-        self.icons.extend(taskbar_elements);
     }
     fn resize_wallpaper(&mut self) {
         let resized = self.desktop_background.clone().unwrap().resize_exact(self.window_w,self.window_h,FilterType::Lanczos3);
@@ -307,6 +295,7 @@ impl ApplicationHandler for AppMain<'_> {
             self.init_physics();
             self.startup_time = Instant::now();
             self.window.as_ref().unwrap().set_visible(true);
+            self.window.as_ref().unwrap().focus_window();
             #[cfg(not(debug_assertions))]
             self.window.as_ref().unwrap().set_window_level(WindowLevel::AlwaysOnTop);
         }
