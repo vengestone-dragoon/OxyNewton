@@ -1,12 +1,34 @@
 #cargo.toml
 [package]
 name = "OxyNewton"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2024"
 
 [dependencies]
-pixels = "0.15.0"
+windows = {version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_Graphics_Dwm",
+    "Win32_Graphics_Direct3D",
+    "Win32_Graphics_Direct3D11",
+    "Win32_Graphics_Dxgi",
+    "Win32_Graphics_Dxgi_Common",
+    "Win32_System_Com",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Memory",
+    "Win32_System_Diagnostics_Debug",
+    "Win32_System_Threading",
+    "Win32_Storage_FileSystem",
+    "Win32_UI_Accessibility",
+    "Win32_UI_Controls",
+    "Win32_UI_Shell",
+    "Win32_UI_Shell_Common",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_HiDpi",
+]}
+rapier2d = {version = "0.35", features = ["default"]}
+image = {version = "0.25"}
 winit = "0.30.13"
-rapier2d = {version = "0.32.0", features = ["simd-stable"]}
-windows = { version = "0.62.1", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_System_Memory", "Win32_System_Threading", "Win32_System_Diagnostics_Debug", "Win32_UI_Controls", "Win32_Graphics_Gdi", "Win32_UI_Shell", "Win32_Storage", "Win32_Storage_FileSystem", "Win32_System_LibraryLoader", "Win32_System_Console", "Win32_System_Registry", "Win32_Storage_Xps_Printing", "Win32_Storage_Xps", "Win32_Graphics_Dwm"] }
-image = "0.25.10"
+wgpu = "30.0.0"
+pollster = "1.0.1"
+bytemuck = { version = "1.25.2", features = ["derive"] }
