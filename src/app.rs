@@ -192,13 +192,10 @@ impl ApplicationHandler for App {
                 world_size,
             );
 
-            // Windows only delivers `RedrawRequested` to *visible* windows —
-            // showing this only after a first successful render would
-            // deadlock (no render is ever attempted because the window
-            // never gets a chance to redraw). Shown immediately instead, so
-            // the very first frame may briefly show whatever the swapchain's
-            // default contents are, same tradeoff the old pixels-based app
-            // made.
+            // Shown immediately rather than after the first successful
+            // render: `about_to_wait` (see below) renders every window on
+            // every loop iteration regardless, so the first real frame lands
+            // before the user can perceive the swapchain's default contents.
             let attributes = WindowAttributes::default()
                 .with_title("OxyNewton")
                 .with_decorations(false)
@@ -251,14 +248,33 @@ impl ApplicationHandler for App {
             );
         }
 
-        for monitor_window in self.windows.values() {
-            monitor_window.window.request_redraw();
-        }
-
         // Every window is created/shown/focused as of here — start the grace
         // period now rather than from `App::new()`, since GPU/window setup
         // above can itself take a nontrivial amount of time.
         self.startup = Instant::now();
+    }
+
+    /// Renders every window on every loop iteration, rather than only in
+    /// response to `WindowEvent::RedrawRequested`. `RedrawRequested` only
+    /// fires from a real `WM_PAINT`, and on Windows `WM_PAINT`/`WM_TIMER` are
+    /// the lowest-priority messages a thread's queue delivers — they're only
+    /// synthesized once that thread's *entire* queue (every window it owns)
+    /// goes idle. With both monitor windows on the one event-loop thread,
+    /// switching focus from window A to window B makes B start receiving a
+    /// steady stream of real input/activation traffic, which keeps the queue
+    /// permanently "busy" from the OS's point of view and starves A's pending
+    /// paint indefinitely — that's what was behind both the "unfocused window
+    /// freezes" bug and the "first monitor never shows its starting frame"
+    /// bug (its `WM_PAINT` was starved by the next monitor's window stealing
+    /// focus during setup). `about_to_wait` is plain winit-level bookkeeping
+    /// called once per `ControlFlow::Poll` iteration, entirely outside that
+    /// message-priority scheme, so driving renders from here sidesteps the
+    /// starvation rather than trying to out-prioritize it.
+    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
+        for monitor_window in self.windows.values() {
+            let snapshot = monitor_window.sim.snapshot();
+            monitor_window.renderer.render(&self.gpu, &snapshot);
+        }
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, window_id: WindowId, event: WindowEvent) {
@@ -326,11 +342,6 @@ impl ApplicationHandler for App {
                     ElementState::Pressed => monitor_window.sim.send(SimCommand::Grab(monitor_window.last_cursor)),
                     ElementState::Released => monitor_window.sim.send(SimCommand::Release),
                 }
-            }
-            WindowEvent::RedrawRequested => {
-                let snapshot = monitor_window.sim.snapshot();
-                monitor_window.renderer.render(&self.gpu, &snapshot);
-                monitor_window.window.request_redraw();
             }
             _ => {}
         }
